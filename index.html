@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>AI Medical Report Analyzer</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <style>
+        body {
+            margin: 0;
+            font-family: 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
+            color: white;
+        }
+        
+        .container {
+            max-width: 500px;
+            margin: 50px auto;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4);
+            backdrop-filter: blur(10px);
+        }
+        
+        h2 {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        
+        input,
+        button {
+            width: 100%;
+            padding: 12px;
+            margin: 8px 0;
+            border-radius: 8px;
+            border: none;
+            font-size: 15px;
+        }
+        
+        input {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+        }
+        
+        button {
+            background: #00c6ff;
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+        
+        button:hover {
+            background: #0072ff;
+        }
+        
+        .result-box {
+            margin-top: 20px;
+            background: rgba(0, 0, 0, 0.4);
+            padding: 15px;
+            border-radius: 10px;
+            display: none;
+        }
+        
+        .risk-high {
+            color: #ff4d4d;
+            font-weight: bold;
+        }
+        
+        .risk-moderate {
+            color: #ffa500;
+            font-weight: bold;
+        }
+        
+        .risk-low {
+            color: #00ff88;
+            font-weight: bold;
+        }
+        
+        .footer {
+            text-align: center;
+            margin-top: 30px;
+            font-size: 13px;
+            opacity: 0.8;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="container">
+        <h2>🏥 AI Medical Report Analyzer</h2>
+
+        <!-- REGISTER -->
+        <h3>Register</h3>
+        <input type="text" id="regUser" placeholder="Username">
+        <input type="password" id="regPass" placeholder="Password">
+        <button onclick="register()">Register</button>
+
+        <!-- LOGIN -->
+        <h3>Login</h3>
+        <input type="text" id="loginUser" placeholder="Username">
+        <input type="password" id="loginPass" placeholder="Password">
+        <button onclick="login()">Login</button>
+
+        <!-- UPLOAD -->
+        <h3>Upload Medical PDF</h3>
+        <input type="file" id="pdfFile" accept=".pdf">
+        <button onclick="uploadPDF()">Analyze Report</button>
+
+        <div class="result-box" id="resultBox">
+            <h3>AI Analysis Result</h3>
+            <p><strong>Summary:</strong></p>
+            <p id="summary"></p>
+
+            <p><strong>Detected Issues:</strong></p>
+            <ul id="issues"></ul>
+
+            <p><strong>Risk Level:</strong> <span id="risk"></span></p>
+        </div>
+
+        <div class="footer">
+            AI Hospital System © 2026
+        </div>
+    </div>
+
+    <script>
+        let token = "";
+
+        // REGISTER
+        async function register() {
+            const username = document.getElementById("regUser").value;
+            const password = document.getElementById("regPass").value;
+
+            const res = await fetch("http://127.0.0.1:5000/api/register", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    username,
+                    password
+                })
+            });
+
+            const data = await res.json();
+            alert(data.message || data.error);
+        }
+
+        // LOGIN
+        async function login() {
+            const username = document.getElementById("loginUser").value;
+            const password = document.getElementById("loginPass").value;
+
+            const res = await fetch("http://127.0.0.1:5000/api/login", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    username,
+                    password
+                })
+            });
+
+            const data = await res.json();
+
+            if (data.access_token) {
+                token = data.access_token;
+                alert("Login Successful ✅");
+            } else {
+                alert(data.error);
+            }
+        }
+
+        // UPLOAD PDF
+        async function uploadPDF() {
+
+            if (!token) {
+                alert("Please login first!");
+                return;
+            }
+
+            const fileInput = document.getElementById("pdfFile");
+            const file = fileInput.files[0];
+
+            if (!file) {
+                alert("Select a PDF file");
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append("file", file);
+
+            const res = await fetch("http://127.0.0.1:5000/api/upload", {
+                method: "POST",
+                headers: {
+                    "Authorization": "Bearer " + token
+                },
+                body: formData
+            });
+
+            const data = await res.json();
+
+            document.getElementById("resultBox").style.display = "block";
+            document.getElementById("summary").innerText = data.summary;
+
+            const issuesList = document.getElementById("issues");
+            issuesList.innerHTML = "";
+            data.detected_issues.forEach(issue => {
+                const li = document.createElement("li");
+                li.innerText = issue;
+                issuesList.appendChild(li);
+            });
+
+            const risk = document.getElementById("risk");
+            risk.innerText = data.risk_level;
+
+            risk.className = "";
+            if (data.risk_level === "High") risk.classList.add("risk-high");
+            else if (data.risk_level === "Moderate") risk.classList.add("risk-moderate");
+            else risk.classList.add("risk-low");
+        }
+    </script>
+
+</body>
+
+</html>
