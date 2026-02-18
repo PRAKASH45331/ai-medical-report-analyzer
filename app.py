@@ -1,14 +1,17 @@
 # =====================================================
-# AI-Based Medical Report Analyzer - PRO VERSION FINAL
-# Save AI Results + Generate PDF + Admin Dashboard
-# AUTO ADMIN SETUP INCLUDED
+# AI-Based Medical Report Analyzer - COMPLETE VERSION
 # =====================================================
 
 import os
 import sqlite3
 import datetime
-from flask import Flask, request, jsonify, send_file
-from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
+from flask import Flask, request, jsonify, send_file, send_from_directory
+from flask_jwt_extended import (
+    JWTManager,
+    create_access_token,
+    jwt_required,
+    get_jwt_identity
+)
 from flask_cors import CORS
 from werkzeug.security import generate_password_hash, check_password_hash
 import pdfplumber
@@ -17,14 +20,18 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib.units import inch
 from reportlab.lib.pagesizes import A4
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 # ------------------------------------------
-# CONFIG
+# APP CONFIG
 # ------------------------------------------
 app = Flask(__name__)
 CORS(app)
 
-app.config["JWT_SECRET_KEY"] = "super_secret_key_12345"
+app.config["JWT_SECRET_KEY"] = os.getenv("JWT_SECRET_KEY", "super_secret_key_12345")
 jwt = JWTManager(app)
 
 UPLOAD_FOLDER = "uploads"
@@ -34,32 +41,70 @@ DATABASE = "database.db"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(REPORT_FOLDER, exist_ok=True)
 
-# 🔴 CHANGE THIS USERNAME TO YOUR ADMIN USERNAME
 DEFAULT_ADMIN_USERNAME = "admin"
+
+# ------------------------------------------
+# HOME ROUTE
+# ------------------------------------------
+@app.route("/")
+def home():
+    return send_from_directory('frontend', 'index.html')
+
+@app.route("/<path:filename>")
+def serve_static(filename):
+    return send_from_directory('frontend', filename)
 
 # ------------------------------------------
 # OPENAI CONFIG
 # ------------------------------------------
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "your-openai-api-key-here")
 
-if not OPENAI_API_KEY:
-    print("⚠ OPENAI_API_KEY not set!")
+if not OPENAI_API_KEY or OPENAI_API_KEY == "your-openai-api-key-here":
+    print("⚠ OPENAI_API_KEY not set! Please set it as environment variable or update the default value.")
+    print("To set environment variable:")
+    print("Windows: set OPENAI_API_KEY=your_actual_api_key")
+    print("Linux/Mac: export OPENAI_API_KEY=your_actual_api_key")
 
 client = OpenAI(api_key=OPENAI_API_KEY)
 
 # ------------------------------------------
-# DATABASE INIT + AUTO ADMIN SETUP
+# EXTERNAL API CONFIG (SECURE HEADERS)
+# ------------------------------------------
+EXTERNAL_API_TOKEN = os.getenv("EXTERNAL_API_TOKEN")
+
+headers = {
+    "Accept": "application/json",
+    "Authorization": f"Bearer {EXTERNAL_API_TOKEN}"
+}
+
+# ------------------------------------------
+# DATABASE INIT + AUTO ADMIN
 # ------------------------------------------
 def init_db():
     with sqlite3.connect(DATABASE) as conn:
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS users (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                username TEXT UNIQUE,
-                password TEXT,
-                role TEXT DEFAULT 'user'
-            )
-        """)
+        # Check if users table exists and has role column
+        cursor = conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='users'")
+        users_table_exists = cursor.fetchone() is not None
+        
+        if users_table_exists:
+            # Check if role column exists
+            cursor = conn.execute("PRAGMA table_info(users)")
+            columns = [row[1] for row in cursor.fetchall()]
+            if 'role' not in columns:
+                # Add role column to existing table
+                conn.execute("ALTER TABLE users ADD COLUMN role TEXT DEFAULT 'user'")
+        else:
+            # Create users table with role column
+            conn.execute("""
+                CREATE TABLE users (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    username TEXT UNIQUE,
+                    password TEXT,
+                    role TEXT DEFAULT 'user'
+                )
+            """)
+        
+        # Create reports table if it doesn't exist
         conn.execute("""
             CREATE TABLE IF NOT EXISTS reports (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -70,7 +115,6 @@ def init_db():
         """)
         conn.commit()
 
-        # ✅ AUTO CREATE ADMIN IF NOT EXISTS
         admin_user = conn.execute(
             "SELECT * FROM users WHERE username=?",
             (DEFAULT_ADMIN_USERNAME,)
@@ -83,7 +127,7 @@ def init_db():
                 (DEFAULT_ADMIN_USERNAME, admin_password, "admin")
             )
             conn.commit()
-            print("✅ Default admin created → Username: admin | Password: admin123")
+            print("✅ Default admin created → username: admin | password: admin123")
 
 init_db()
 
@@ -200,7 +244,6 @@ def upload():
     os.remove(filepath)
 
     ai_result = analyze_medical_text(text)
-
     created_at = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     with sqlite3.connect(DATABASE) as conn:
@@ -280,6 +323,10 @@ def admin_reports():
 # RUN
 # ------------------------------------------
 if __name__ == "__main__":
-    print("🚀 PRO AI Medical Analyzer Running...")
-    print("👑 Default Admin → username: admin | password: admin123")
-    app.run(debug=True)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)
+    print("🚀 AI Medical Analyzer Running...")
+    print("👑 Admin login → username: admin | password: admin123")
+
+# For deployment compatibility
+app = app

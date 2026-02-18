@@ -1,11 +1,30 @@
+/* ==========================================
+   AI Medical Analyzer - Frontend JS
+   Secure Production Version
+========================================== */
+
 const API_BASE = "http://127.0.0.1:5000/api";
+// ⚠️ Change to your Render URL after deployment
+// Example:
+//const API_BASE = "https://ai-medical-analyzer-xyz1.onrender.com/api";
 
 let token = localStorage.getItem("token") || "";
 
-/* ---------------- REGISTER ---------------- */
-document.getElementById("registerBtn").addEventListener("click", registerUser);
-document.getElementById("loginBtn").addEventListener("click", loginUser);
-document.getElementById("uploadBtn").addEventListener("click", uploadPDF);
+/* ================= INIT ================= */
+
+document.addEventListener("DOMContentLoaded", () => {
+
+    const registerBtn = document.getElementById("registerBtn");
+    const loginBtn = document.getElementById("loginBtn");
+    const uploadBtn = document.getElementById("uploadBtn");
+
+    if (registerBtn) registerBtn.addEventListener("click", registerUser);
+    if (loginBtn) loginBtn.addEventListener("click", loginUser);
+    if (uploadBtn) uploadBtn.addEventListener("click", uploadPDF);
+
+});
+
+/* ================= REGISTER ================= */
 
 async function registerUser() {
 
@@ -25,14 +44,19 @@ async function registerUser() {
         });
 
         const data = await res.json();
-        showStatus(data.message || data.error, res.ok ? "lightgreen" : "red");
+
+        showStatus(
+            data.message || data.error || "Registration complete",
+            res.ok ? "lightgreen" : "red"
+        );
 
     } catch (error) {
         showStatus("Server error during registration", "red");
     }
 }
 
-/* ---------------- LOGIN ---------------- */
+/* ================= LOGIN ================= */
+
 async function loginUser() {
 
     const username = document.getElementById("loginUser").value.trim();
@@ -65,7 +89,8 @@ async function loginUser() {
     }
 }
 
-/* ---------------- UPLOAD PDF ---------------- */
+/* ================= UPLOAD PDF ================= */
+
 async function uploadPDF() {
 
     if (!token) {
@@ -81,10 +106,15 @@ async function uploadPDF() {
         return;
     }
 
+    if (file.type !== "application/pdf") {
+        showStatus("Only PDF files are allowed", "red");
+        return;
+    }
+
     const formData = new FormData();
     formData.append("file", file);
 
-    showStatus("Analyzing report...", "yellow");
+    showStatus("Analyzing report... ⏳", "orange");
 
     try {
         const res = await fetch(`${API_BASE}/upload`, {
@@ -110,37 +140,78 @@ async function uploadPDF() {
     }
 }
 
-/* ---------------- DISPLAY RESULT ---------------- */
+/* ================= DISPLAY RESULT ================= */
+
 function displayResult(data) {
 
-    document.getElementById("resultBox").style.display = "block";
+    const resultBox = document.getElementById("resultBox");
+    if (!resultBox) return;
 
-    document.getElementById("summary").innerText = data.summary;
+    resultBox.style.display = "block";
+
+    const summary = document.getElementById("summary");
+    summary.innerText = data.summary || "No summary available.";
+
+    // Since backend returns formatted text, we safely display it.
+    // (Your current backend does not return detected_issues array separately)
 
     const issuesList = document.getElementById("issues");
-    issuesList.innerHTML = "";
-
-    data.detected_issues.forEach(issue => {
-        const li = document.createElement("li");
-        li.innerText = issue;
-        issuesList.appendChild(li);
-    });
+    if (issuesList) {
+        issuesList.innerHTML = "";
+    }
 
     const risk = document.getElementById("risk");
-    risk.innerText = data.risk_level;
-    risk.className = "";
-
-    if (data.risk_level === "High")
-        risk.classList.add("risk-high");
-    else if (data.risk_level === "Moderate")
-        risk.classList.add("risk-moderate");
-    else
-        risk.classList.add("risk-low");
+    if (risk) {
+        risk.innerText = "See summary above";
+        risk.className = "risk-moderate";
+    }
 }
 
-/* ---------------- STATUS ---------------- */
+/* ================= DOWNLOAD REPORT ================= */
+
+async function downloadReport(reportId) {
+
+    if (!token) {
+        showStatus("Please login first!", "red");
+        return;
+    }
+
+    try {
+        const res = await fetch(`${API_BASE}/download/${reportId}`, {
+            method: "GET",
+            headers: {
+                "Authorization": "Bearer " + token
+            }
+        });
+
+        if (!res.ok) {
+            showStatus("Download failed", "red");
+            return;
+        }
+
+        const blob = await res.blob();
+        const url = window.URL.createObjectURL(blob);
+
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `medical_report_${reportId}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+
+        showStatus("Download started ✅", "lightgreen");
+
+    } catch (error) {
+        showStatus("Download error", "red");
+    }
+}
+
+/* ================= STATUS MESSAGE ================= */
+
 function showStatus(message, color) {
     const status = document.getElementById("status");
+    if (!status) return;
+
     status.innerText = message;
     status.style.color = color;
 }
