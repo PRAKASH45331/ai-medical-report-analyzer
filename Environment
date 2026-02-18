@@ -1,0 +1,10 @@
+KEY: OPENAI_API_KEY
+VALUE: your_real_openai_key
+curl --request GET \
+     --url 'https://api.render.com/v1/services?cursor=mpFjFKeYgnw=' \
+     --header 'Accept: application/json' \
+     --header 'Authorization: Bearer rnd_cBEluIHZOkDnTXhzzc1QThDxeqZh'
+\
+OPENAI_API_KEY = your_real_key
+EXTERNAL_API_TOKEN = your_external_token
+JWT_SECRET_KEY = something_random_secure
