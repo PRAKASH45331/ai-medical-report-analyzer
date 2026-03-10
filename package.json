@@ -1,0 +1,1 @@
+{\n  "name": "ai-medical-report-analyzer",\n  "private": true,\n  "workspaces": [\n    "frontend/*",\n    "backend/*"\n  ],\n  "devDependencies": {},\n  "dependencies": {}\n}
